@@ -1,0 +1,231 @@
+import os
+from atom.api import (Atom, Unicode, Range, List, Bool, ForwardInstance)
+
+from enaml.widgets.api import (
+    Window, Container, PushButton, CheckBox, RadioButton, SpinBox
+)
+from enaml.core.looper import Looper
+from enaml.stdlib.mapped_view import MappedView
+
+from enaml.image import Image
+from enaml.icon import Icon,IconImage
+from enaml.core.dynamic_template import DynamicTemplate
+
+
+from enaml_data.widgets.api import (
+    TreeView, TreeViewItem, TreeViewColumn,
+)
+
+
+def icon_path(name):
+    path = os.getcwd()
+    return os.path.join(path,'../','images','icons','%s.png'%name)
+
+
+def load_image(name):
+    with open(icon_path(name),'rb') as f:
+        data = f.read()
+    return Image(data=data)
+
+
+def load_icon(name):
+    img = load_image(name)
+    icg = IconImage(image=img) 
+    return Icon(images=[icg])
+
+
+class Person(Atom):
+    """ A simple class representing a person object.
+
+    """
+    last_name = Unicode()
+
+    first_name = Unicode()
+    
+    children = List(ForwardInstance(lambda:Person))
+
+    age = Range(low=0)
+
+    debug = Bool(False)
+    
+    def __repr__(self):
+        return "Person(first_name={},last_name={})".format(self.first_name,self.last_name)
+
+
+class Model(Atom):
+    people = List(Person)
+    
+    def add_person(self):
+        people = self.people[:]
+        person = Person(last_name='Doe',first_name='John',age=len(self.people))
+        people.append(person)
+        self.people = people
+    
+    def remove_person(self):
+        people = self.people[:]
+        people.pop()
+        self.people = people
+
+
+template TreeItemLoop(items):
+    """ A templated loop which maps a template over a sequence."""
+    TreeItemLoop(tuple(items[:-1])):
+        pass
+    AutoTreeItem:
+        item = items[-1]
+  
+
+template TreeItemLoop(items: ()):
+    """ The terminating condition for the templated loop."""
+    pass
+
+
+template AutoTreeItemNode(item):
+    """ Template for tree item nodes. This defines
+        the columns and how the tree will be walked.
+    """
+    TreeViewColumn:
+        checkable = True
+        checked := item.debug
+        icon << item.debug and load_icon('bug') or None
+    TreeViewColumn:
+        text << item.first_name
+    TreeViewColumn:
+        text << item.last_name
+    TreeViewColumn:
+        SpinBox:
+            value << item.age
+    TreeViewColumn:
+        text << 'parent {}'.format(item.children)
+        foreground << '#CCCCCC' #if parent_index &1 else '#333333'
+    TreeItemLoop(tuple(item.children)):
+        pass
+
+
+enamldef AutoTreeItem(TreeViewItem):
+    attr item
+    text = str(item)
+    items << item.children
+    DynamicTemplate:
+        base = AutoTreeItemNode
+        args = (item,)
+            
+
+enamldef Main(Window):
+    attr model = Model(people=[
+                    Person(last_name='Jones-%i'%i,
+                           first_name='Bob-%i'%i,
+                           age=i,
+                           debug=bool(i&1),
+                           children=[
+                                Person(last_name='Lill-%i-%i'%(i,j),first_name='Jill-%i-%i'%(i,j),age=i)
+                                #Person(last_name='Wack-%i-%i'%(i,j),first_name='Jack-%i-%i'%(i,j),age=i),
+                            for j in range(2)]
+                    ) for i in range(5)])
+    Container:
+        PushButton:
+            text = 'Add person'
+            clicked :: model.add_person()
+        PushButton:
+            text = 'Remove person'
+            clicked :: model.remove_person()
+            
+        TreeView: tree:
+            horizontal_headers << ['#','Debug','First','Last','Age','Relationship']
+            items << model.people
+            Looper:
+                iterable << tree.items
+                AutoTreeItem:
+                    item = loop_item 
+#                 TreeViewItem:
+#                     text = '{}'.format(loop_item)
+#                     items << loop_item.children
+#                     Looper:
+#                         iterable << parent.items
+#                         TreeViewItem:
+#                             text << '{}'.format(loop_item)
+            
+#             Looper:
+#                 iterable << range(tree.visible_rows)#min(tree.visible_rows,len(tree.items)))
+#                 TreeViewItem:
+#                     attr parent_index << tree.visible_row+loop_index
+#                     attr person << tree.items[parent_index] 
+#                     text << '{}'.format(person)
+#                     items << person.children
+#                      
+#                     TreeViewColumn:
+#                         checkable = True
+#                         checked := person.debug
+#                         icon << person.debug and load_icon('bug') or None
+#                     TreeViewColumn:
+#                         text << person.first_name
+#                     TreeViewColumn:
+#                         text << person.last_name
+#                     TreeViewColumn:
+#                         SpinBox:
+#                             value << person.age
+#                     TreeViewColumn:
+#                         text << 'parent {}'.format(person.children)
+#                         foreground << '#CCCCCC' if parent_index &1 else '#333333'
+#                     
+                    # TODO: This should only be run when expanded
+#                     Looper:
+#                         iterable << range(min(tree.visible_rows,len(parent.items)))
+#                         TreeViewItem:
+#                             attr child << parent.items[loop_index]
+#                             text << '{}'.format(child)
+#                             TreeViewColumn:
+#                                 checkable = True
+#                                 checked := child.debug
+#                             TreeViewColumn:
+#                                 text << child.first_name
+#                             TreeViewColumn:
+#                                 text << child.last_name
+#                             TreeViewColumn:
+#                                 SpinBox:
+#                                     value << child.age
+#                             TreeViewColumn:
+#                                 text = 'child'
+#                             
+                            # TODO: How to go arbitrarily deep?
+                            
+#                     Looper:
+#                         iterable << parent.items if parent.items else []
+#                         TreeViewItem:
+#                             attr person << parent.items[loop_index] 
+#                             text << '{}'.format(person)
+#                             items << person.children
+#                              
+#                             TreeViewColumn:
+#                                 checkable = True
+#                                 checked := person.debug
+#                             TreeViewColumn:
+#                                 text << person.first_name
+#                             TreeViewColumn:
+#                                 text << person.last_name
+#                             TreeViewColumn:
+#                                 text = 'Child?'
+#                                 pass
+                        #MappedView:
+                        
+                            #SpinBox:
+                            #    value << person.age
+                        # TODO:
+#                         Looper:
+#                             iterable << person.children
+#                             TreeViewItem: # Child item
+#                                 text << 'child %s.%s'%(parent_index,loop_index)
+#                                 TreeViewColumn:
+#                                     checkable = True
+#                                     checked := loop_item.debug
+#                                 TreeViewColumn:
+#                                     text << loop_item.first_name
+#                                 TreeViewColumn:
+#                                     text << loop_item.last_name
+#                                 TreeViewColumn:
+#                                     #text << str(loop_item.age)
+#                                     SpinBox:
+#                                         value << loop_item.age
+                
+                # Going arbitrarily deep?
+                
