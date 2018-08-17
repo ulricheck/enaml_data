@@ -84,7 +84,7 @@ class QtTableView(QtAbstractItemView, ProxyTableView):
         self.widget.verticalHeader().setStretchLastSection(stretch)
     
     def set_resize_mode(self, mode):
-        self.widget.horizontalHeader().setResizeMode(RESIZE_MODES[mode])
+        self.widget.horizontalHeader().setSectionResizeMode(RESIZE_MODES[mode])
         
     def set_show_horizontal_header(self, show):
         header = self.widget.horizontalHeader()
